@@ -1,0 +1,219 @@
+---
+bind:
+  # Fully-Qualified Domain Name (FQDN) or IPv4 address of LDAP server to bind to.
+  #
+  # Default: not set
+  #ldap_host:
+
+  # Use port 636 if setting use_ssl to True.
+  #
+  # Default: 389
+  ldap_port: 389
+
+  # If setting to True, set port to 636.
+  #
+  # Default: False
+  use_ssl: False
+
+  # Distinguished Name (DN) of user to bind to LDAP server with.
+  #
+  # Default: not set
+  #bind_dn:
+
+  # Set to True to prompt for password.
+  # If password is set below but this option is also set to True,
+  # the defined password will be ignored and the user will be prompted
+  # for a password.
+  #
+  # Default: True
+  prompt_passwd: True
+
+  # Password to bind to the LDAP server with.
+  #
+  # Default: not set
+  #bind_passwd:
+
+search:
+  # The root Distinguished Name (DN) to use when running queries against the LDAP server.
+  #
+  # Default: not set
+  #base_dn:
+
+  # User search configurations
+  users:
+    # Used in addition to the base DN (base_dn) when searching for users. If no value is
+    # supplied, the subtree search will start from the base DN (base_dn).
+    #
+    # Default: "cn=users,cn=accounts"
+    user_dn: "cn=users,cn=accounts"
+
+    # Name of the class used for LDAP user objects.
+    #
+    # Default: "posixAccount"
+    user_obj_class: "posixAccount"
+
+    # LDAP filter to use to search for users
+    #
+    # Default: "(objectClass=posixAccount)"
+    user_filter: "(objectClass=posixAccount)"
+
+    # The name of the attribute where a user's login name is stored.
+    #
+    # Default: "uid"
+    username_attr: "uid"
+
+    # The attribute field to use when loading the user's groups.
+    #
+    # Default: "memberOf"
+    user_member_attr: "memberOf"
+
+  # Group search configurations
+  groups:
+    # Used in addition to the base DN (base_dn) when searching for groups. If no value is
+    # supplied, the subtree will start from the base DN (base_dn).
+    #
+    # Default: "cn=groups,cn=accounts"
+    group_dn: "cn=groups,cn=accounts"
+
+    # Name of the class used for LDAP group objects.
+    #
+    # Default: "posixGroup"
+    group_obj_class: "posixGroup"
+
+    # LDAP filter to use to search for groups.
+    #
+    # Default: "(objectClass=posixGroup)"
+    group_filter: "(objectClass=posixGroup)"
+
+    # The name of the attribute where the group name is stored.
+    #
+    # Default: "cn"
+    group_name_attr: "cn"
+
+    # The name of the attribute where the group description is stored.
+    #
+    # Default: "description"
+    group_desc_attr: "description"
+
+    # The attribute field to use when loading the group's members.
+    #
+    # Default: "member"
+    group_member_attr: "member"
+
+  # Host-Based Access Control (HBAC) rule search configurations
+  hbac_rules:
+    # Used in addition to the base DN (base_dn) when searching for HBAC rules. If no value is
+    # supplied, the subtree search will start from the base DN (base_dn).
+    #
+    # Default: "cn=hbac"
+    hbacrule_dn: "cn=hbac"
+
+    # Name of the class used for LDAP HBAC rule objects.
+    #
+    # Default: "ipahbacrule"
+    hbacrule_obj_class: "ipahbacrule"
+
+    # LDAP filter to use to search for HBAC rules.
+    #
+    # Default: "(objectClass=ipahbacrule)"
+    hbacrule_filter: "(objectClass=ipahbacrule)"
+
+    # The name of the attribute where the HBAC rule name is stored.
+    #
+    # Default: "cn"
+    hbacrule_name_attr: "cn"
+
+    # The name of the attribute where each member user is stored.
+    #
+    # Default: "memberUser"
+    hbacrule_member_attr: "memberUser"
+
+  # Sudo rule search configurations
+  sudo_rules:
+    # Used in addition to the base DN (base_dn) when searching for Sudo rules. If no value is
+    # supplied, the subtree search will start from the base DN (base_dn).
+    #
+    # Default: "cn=sudorules,cn=sudo"
+    sudorule_dn: "cn=sudorules,cn=sudo"
+
+    # Name of the class used for LDAP Sudo rule objects.
+    #
+    # Default: "ipasudorule"
+    sudorule_obj_class: "ipasudorule"
+
+    # LDAP filter to use to search for Sudo rules.
+    #
+    # Default: "(objectClass=ipasudorule)"
+    sudorule_filter: "(objectClass=ipasudorule)"
+
+    # The name of the attribute where the Sudo rule name is stored.
+    #
+    # Default: "cn"
+    sudorule_name_attr: "cn"
+
+    # The name of the attribute where each member user is stored.
+    #
+    # Default: "memberUser"
+    sudorule_member_attr: "memberUser"
+
+  # Sudo rule search configurations
+  host_groups:
+    # Used in addition to the base DN (base_dn) when searching for host groups. If no value is
+    # supplied, the subtree search will start from the base DN (base_dn).
+    #
+    # Default: "cn=hostgroups,cn=accounts"
+    hostgroup_dn: "cn=hostgroups,cn=accounts"
+
+    # Name of the class used for LDAP host group objects.
+    #
+    # Default: "ipahostgroup"
+    hostgroup_obj_class: "ipahostgroup"
+
+    # LDAP filter to use to search for host groups.
+    #
+    # Default: "(objectClass=ipahostgroup)"
+    hostgroup_filter: "(objectClass=ipahostgroup)"
+
+    # The name of the attribute where the host group name is stored.
+    #
+    # Default: "cn"
+    hostgroup_name_attr: "cn"
+
+    # The name of the attribute where each member host is stored.
+    #
+    # Default: "member"
+    hostgroup_member_attr: "member"
+
+    # The name of the attribute where the host groups memberships are stored
+    #
+    # Default: "memberOf"
+    hostgroup_memberof_attr: "memberOf"
+
+  # Host search configurations
+  hosts:
+    # Used in addition to the base DN (base_dn) when searching for hosts. If no value is
+    # supplied, the subtree search will start from the base DN (base_dn).
+    #
+    # Default: "cn=computers,cn=accounts"
+    host_dn: "cn=computers,cn=accounts"
+
+    # Name of the class used for LDAP host objects.
+    #
+    # Default: "ipahost"
+    host_obj_class: "ipahost"
+
+    # LDAP filter to use to search for hosts
+    #
+    # Default: "(objectClass=ipahost)"
+    host_filter: "(objectClass=ipahost)"
+
+    # The name of the attribute where the hostname is stored.
+    #
+    # Default: "cn"
+    host_name_attr: "cn"
+
+    # The attribute field to use when loading a hosts's host groups.
+    #
+    # Default: "memberOf"
+    host_member_attr: "memberOf"
+

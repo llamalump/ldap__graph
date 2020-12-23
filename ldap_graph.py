@@ -10,13 +10,12 @@ import confuse
 import getpass
 import json
 import ldap
+import logging
 
 from graphviz import Digraph
 
 # Global declarations
-#USER_DN="cn=users,cn=accounts"
-#GROUP_DN="cn=groups,cn=accounts"
-DEFAULT_CONFIG_FILE_PATH="conf/default.yml"
+DEFAULT_CONFIG_FILE_PATH="./conf/default.yml"
 
 class PasswordPromptAction(argparse.Action):
     """An argparse action to securely prompt
@@ -50,64 +49,20 @@ def parse_args():
     """
     parser = argparse.ArgumentParser("Walk an LDAP tree to generate a data structure that can be used to generate a graph showing the relationships between discovered LDAP objects")
     parser.add_argument(
-        "-b",
-        "--base-dn",
+        "-c",
+        "--config",
         type=str,
-        dest="base_dn",
-        required=True,
-        help="The base DN of the LDAP tree to search from"
+        dest="config_file_path",
+        default="DEFAULT_CONFIG_FILE_PATH",
+        help="Path to a configuration file. If unspecified, '{0}' is used".format(
+            DEFAULT_CONFIG_FILE_PATH
+        )
     )
     parser.add_argument(
-        "-H",
-        "--bind-host",
-        type=str,
-        dest="bind_host",
-        required=True,
-        help="The hostname of the LDAP server to bind to"
-    )
-    parser.add_argument(
-        "-s",
-        "--secure",
+        "-v",
+        "--verbose",
         action="store_true",
-        dest="use_ssl",
-        help="Use SSL (LDAPS)"
-    )
-    parser.add_argument(
-        "-p",
-        "--port",
-        dest="ldap_port",
-        type=int,
-        help="Specify a non-standard port to connect to the LDAP server on"
-    )
-    parser.add_argument(
-        "-f",
-        "--filter",
-        type=str,
-        dest="search_filter",
-        default="(objectClass=*)",
-        help="Filter string to limit the results"
-    )
-    parser.add_argument(
-        "-D",
-        "--bind-dn",
-        type=str,
-        dest="bind_dn",
-        help="The user DN to bind to the LDAP directory with"
-    )
-    passwd = parser.add_mutually_exclusive_group()
-    passwd.add_argument(
-        "-w",
-        "--bind-passwd",
-        type=str,
-        dest="bind_passwd",
-        help="Specify a bind password on the CLI. Use -W to prompt for one"
-    )
-    passwd.add_argument(
-        "-W",
-        "--prompt-passwd",
-        action=PasswordPromptAction,
-        dest="bind_passwd",
-        help="Prompts the user for a password to bind to the LDAP server with"
+        help="Print verbose output"
     )
 
     # Add sub-parsers for the different graphing frameworks this app supports.
@@ -118,21 +73,117 @@ def parse_args():
 
     args = parser.parse_args()
 
-    if args.gssapi and (args.bind_dn is not None or args.bind_passwd is not None):
-        parser.error("Option to use GSSAPI authentication specified (-Y). Using -D and/or -w/-W while trying to use GSSAPI authenticaton is not allowed.")
-
-    if args.use_ssl:
-        if args.ldap_port:
-            args.bind_url = f'ldaps://{args.bind_host}:{args.ldap_port}'
-        else:
-            args.bind_url = f'ldaps://{args.bind_host}:636'
-    else:
-        if args.ldap_port:
-            args.bind_url = f'ldap://{args.bind_host}:{args.ldap_port}'
-        else:
-            args.bind_url = f'ldap://{args.bind_host}:389'
-
     return args
+
+def configure_logging(verbose=False):
+    """Configures the logging module for this script
+    """
+    logger = logging.getLogger("ldap_graph")
+    formatter = logging.Formatter(fmt='{"time": "%(asctime)s.%(msecs)03d", "type": "log", "module": "%(name)s", "level": "%(levelname)s", "msg": "%(message)s"}', datefmt="%Y-%m-%d %H:%M:%S")
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+
+    if verbose:
+        logger.setLevel(logging.DEBUG)
+        console_handler.setLevel(logging.DEBUG)
+    else:
+        logger.setLevel(logging.INFO)
+        console_handler.setLevel(logging.INFO)
+
+    logger.addHandler(console_handler)
+
+    return logger
+
+
+
+class Configuration():
+
+    def __init__(self, config_file_path=None):
+        """Constructor
+
+        Params:
+          config_file_path  (str)
+            Path to a configuration file (optional)
+        """
+        self.config_file_path = config_file_path
+        self.raw_config = self.read_config(self.config_file_path)
+        self.load_config(self.raw_config)
+
+    def read_config(self, config_file_path):
+        """Parse user-defined YAML config file
+
+        Params:
+          config_file_path  (str)
+            Path to a configuration file
+        """
+        config = confuse.Configuration("ldap_graph", __name__)
+        # Read in default configurations
+        config.set_file(DEFAULT_CONFIG_FILE_PATH)
+        # Read in user-defined configurations (will overwrite any defaults)
+        if config_file_path:
+            config.set_file(config_file_path)
+
+        return config
+
+    def load_config(self, config):
+        """Load configuration from Confuse object
+
+        Params:
+          config   (confuse.core.Configuration)
+            Object returned by confuse.Configuration()
+        """
+        ### Bind configuration
+        self.ldap_host = config["bind"]["ldap_host"].get()
+        self.ldap_port = config["bind"]["ldap_port"].get()
+        self.use_ssl = config["bind"]["use_ssl"].get()
+        self.bind_dn = config["bind"]["bind_dn"].get()
+        if bool(config["bind"]["prompt_passwd"].get()):
+            self.bind_passwd = getpass.getpass()
+        else:
+            self.bind_passwd = config["bind"]["bind_passwd"].get()
+        self.bind_url = f"{'ldaps' if self.use_ssl else 'ldap'}://{self.ldap_host}:{self.ldap_port}"
+
+        ### Search configuration
+        self.base_dn = config["search"]["base_dn"].get()
+        # Users
+        self.user_dn = config["search"]["users"]["user_dn"].get()
+        self.user_obj_class = config["search"]["users"]["user_obj_class"].get()
+        self.user_filter = config["search"]["users"]["user_filter"].get()
+        self.username_attr = config["search"]["users"]["username_attr"].get()
+        self.user_member_attr = config["search"]["users"]["user_member_attr"].get()
+        # Groups
+        self.group_dn = config["search"]["groups"]["group_dn"].get()
+        self.group_obj_class = config["search"]["groups"]["group_obj_class"].get()
+        self.group_filter = config["search"]["groups"]["group_filter"].get()
+        self.group_name_attr = config["search"]["groups"]["group_name_attr"].get()
+        self.group_desc_attr = config["search"]["groups"]["group_desc_attr"].get()
+        self.group_member_attr = config["search"]["groups"]["group_member_attr"].get()
+        # HBAC rules
+        self.hbacrule_dn = config["search"]["hbac_rules"]["hbacrule_dn"].get()
+        self.hbacrule_obj_class = config["search"]["hbac_rules"]["hbacrule_obj_class"].get()
+        self.hbacrule_filter = config["search"]["hbac_rules"]["hbacrule_filter"].get()
+        self.hbacrule_name_attr = config["search"]["hbac_rules"]["hbacrule_name_attr"].get()
+        self.hbacrule_member_attr = config["search"]["hbac_rules"]["hbacrule_member_attr"].get()
+        # Sudo rules
+        self.sudorule_dn = config["search"]["sudo_rules"]["sudorule_dn"].get()
+        self.sudorule_obj_class = config["search"]["sudo_rules"]["sudorule_obj_class"].get()
+        self.sudorule_filter = config["search"]["sudo_rules"]["sudorule_filter"].get()
+        self.sudorule_name_attr = config["search"]["sudo_rules"]["sudorule_name_attr"].get()
+        self.sudorule_member_attr = config["search"]["sudo_rules"]["sudorule_member_attr"].get()
+        # Hosts
+        self.host_dn = config["search"]["hosts"]["host_dn"].get()
+        self.host_obj_class = config["search"]["hosts"]["host_obj_class"].get()
+        self.host_filter = config["search"]["hosts"]["host_filter"].get()
+        self.host_name_attr = config["search"]["hosts"]["host_name_attr"].get()
+        self.host_member_attr = config["search"]["hosts"]["host_member_attr"].get()
+        # Host groups
+        self.hostgroup_dn = config["search"]["host_groups"]["hostgroup_dn"].get()
+        self.hostgroup_obj_class = config["search"]["host_groups"]["hostgroup_obj_class"].get()
+        self.hostgroup_filter = config["search"]["host_groups"]["hostgroup_filter"].get()
+        self.hostgroup_name_attr = config["search"]["host_groups"]["hostgroup_name_attr"].get()
+        self.hostgroup_member_attr = config["search"]["host_groups"]["hostgroup_member_attr"].get()
+        self.hostgroup_memberof_attr = config["search"]["host_groups"]["hostgroup_memberof_attr"].get()
+
 
 def parse_config(config_file_path=None):
     """Parse user-defined YAML config file
@@ -146,52 +197,35 @@ def parse_config(config_file_path=None):
 
     return config
 
-def dedup_config(parsed_args, parsed_config):
-    """Compare command-line options with configurations
-    parsed from config file.
-    Command-line options will override options defined in
-    any config files.
-
-    Params:
-      parsed_args   (namespace)
-        Output of argparse.parse_args()
-
-      parsed_config (object)
-        YAML configuration parsed by Confuse library
-
-    Returns:
-      config        (dict)
-        Dictionary of deduplicated configuration
-    """
-    config = {}
-
-    
-
-
 if __name__ == "__main__":
 
     args = parse_args()
-    yaml_conf = parse_config()
-    config = dedup_config(args, yaml_conf)
 
-    con = ldap.initialize(args.bind_url, bytes_mode=False)
-    if args.gssapi:
-        con.sasl_gssapi_bind_s()
-    else:
-        con.simple_bind_s(args.bind_dn, args.bind_passwd)
+    logger = configure_logging(args.verbose)
 
-    results = con.search_s(args.base_dn, ldap.SCOPE_SUBTREE, args.search_filter)
-    #print(results)
-    #print(json.dumps(results, indent=4))
-    #for obj in results:
-    #    print(obj)
-    dot = Digraph(comment="LDAP relationship graph")
-    for key, val in results:
-        #out = "{" + key + "}: {" + val + "}"
-        #print(json.dumps(out, indent=4))
-        print(key)
-        print(val)
-        print()
-        dot.node(key, key)
+    logger.info("Loading configuration")
+    #config = parse_config(args.config_file_path)
+    config = Configuration(args.config_file_path)
+    logger.info("Configuration loaded")
+    logger.debug(config.raw_config)
 
-    dot.render("output/dot/ldap_graph.gv")
+    logger.info("Initializing LDAP connection")
+    con = ldap.initialize(config.bind_url, bytes_mode=False)
+    con.simple_bind_s(config.bind_dn, config.bind_passwd)
+
+    user_dn = f"{config.user_dn},{config.base_dn}"
+    users = con.search_s(user_dn, ldap.SCOPE_SUBTREE, config.user_filter)
+
+# TODO: Implement generation of relationship data structure
+
+## TODO: Implement Graphviz rendering
+#    dot = Digraph(comment="LDAP relationship graph")
+#    for key, val in results:
+#        #out = "{" + key + "}: {" + val + "}"
+#        #print(json.dumps(out, indent=4))
+#        print(key)
+#        print(val)
+#        print()
+#        dot.node(key, key)
+#
+#    dot.render("output/dot/ldap_graph.gv")
