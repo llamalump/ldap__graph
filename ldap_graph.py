@@ -138,7 +138,8 @@ class Configuration():
         self.use_ssl = config["bind"]["use_ssl"].get()
         self.bind_dn = config["bind"]["bind_dn"].get()
         if bool(config["bind"]["prompt_passwd"].get()):
-            self.bind_passwd = getpass.getpass()
+            logger.info("prompt_passwd set to 'True' - prompting for password")
+            self.bind_passwd = getpass.getpass("LDAP bind password: ")
         else:
             self.bind_passwd = config["bind"]["bind_passwd"].get()
         self.bind_url = f"{'ldaps' if self.use_ssl else 'ldap'}://{self.ldap_host}:{self.ldap_port}"
@@ -213,8 +214,38 @@ if __name__ == "__main__":
     con = ldap.initialize(config.bind_url, bytes_mode=False)
     con.simple_bind_s(config.bind_dn, config.bind_passwd)
 
+    results = {}
+
     user_dn = f"{config.user_dn},{config.base_dn}"
-    users = con.search_s(user_dn, ldap.SCOPE_SUBTREE, config.user_filter)
+    results["users"] = con.search_s(user_dn, ldap.SCOPE_SUBTREE, config.user_filter)
+    #users = con.search_s(user_dn, ldap.SCOPE_SUBTREE, config.user_filter)
+
+    group_dn = f"{config.group_dn},{config.base_dn}"
+    results["groups"] = con.search_s(group_dn, ldap.SCOPE_SUBTREE, config.group_filter)
+    #groups = con.search_s(group_dn, ldap.SCOPE_SUBTREE, config.group_filter)
+
+    hbacrule_dn = f"{config.hbacrule_dn},{config.base_dn}"
+    results["hbacrules"] = con.search_s(hbacrule_dn, ldap.SCOPE_SUBTREE, config.hbacrule_filter)
+    #hbacrules = con.search_s(hbacrule_dn, ldap.SCOPE_SUBTREE, config.hbacrule_filter)
+
+    sudorule_dn = f"{config.sudorule_dn},{config.base_dn}"
+    results["sudorules"] = con.search_s(sudorule_dn, ldap.SCOPE_SUBTREE, config.sudorule_filter)
+    #sudorules = con.search_s(sudorule_dn, ldap.SCOPE_SUBTREE, config.sudorule_filter)
+
+    host_dn = f"{config.host_dn},{config.base_dn}"
+    results["hosts"] = con.search_s(host_dn, ldap.SCOPE_SUBTREE, config.host_filter)
+    #hosts = con.search_s(host_dn, ldap.SCOPE_SUBTREE, config.host_filter)
+
+    hostgroup_dn = f"{config.hostgroup_dn},{config.base_dn}"
+    results["hostgroups"] = con.search_s(hostgroup_dn, ldap.SCOPE_SUBTREE, config.hostgroup_filter)
+    #hostgroups = con.search_s(hostgroup_dn, ldap.SCOPE_SUBTREE, config.hostgroup_filter)
+
+    tree = {}
+    for obj_type in results:
+        #print(obj_type)
+        for obj_dn, attrs in results[obj_type]:
+            #print(obj, val)
+            tree[obj_type][obj_dn]
 
 # TODO: Implement generation of relationship data structure
 
